@@ -36,6 +36,8 @@ async def generate_overview(s: Stats) -> None:
         output = f.read()
 
     output = re.sub("{{ name }}", await s.name, output)
+    output = re.sub("{{ stars }}", f"{await s.stargazers:,}", output)
+    output = re.sub("{{ forks }}", f"{await s.forks:,}", output)
     output = re.sub("{{ contributions }}", f"{await s.total_contributions:,}", output)
     changed = (await s.lines_changed)[0] + (await s.lines_changed)[1]
     output = re.sub("{{ lines_changed }}", f"{changed:,}", output)
@@ -77,7 +79,6 @@ fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
 <span class="lang">{lang}</span>
 <span class="percent">{data.get("prop", 0):0.2f}%</span>
 </li>
-
 """
 
     output = re.sub(r"{{ progress }}", progress, output)
@@ -112,7 +113,12 @@ async def main() -> None:
     excluded_langs = (
         {x.strip() for x in exclude_langs.split(",")} if exclude_langs else None
     )
-    
+    # Convert a truthy value to a Boolean
+    raw_ignore_forked_repos = os.getenv("EXCLUDE_FORKED_REPOS")
+    ignore_forked_repos = (
+        not not raw_ignore_forked_repos
+        and raw_ignore_forked_repos.strip().lower() != "false"
+    )
     async with aiohttp.ClientSession() as session:
         s = Stats(
             user,
@@ -120,6 +126,7 @@ async def main() -> None:
             session,
             exclude_repos=excluded_repos,
             exclude_langs=excluded_langs,
+            ignore_forked_repos=True,
         )
         await asyncio.gather(generate_languages(s), generate_overview(s))
 
